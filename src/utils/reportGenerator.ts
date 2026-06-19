@@ -632,7 +632,12 @@ export function generateMonthlyReport(
 export function generateShiftSuggestions(hourlyDetail: HourlySlot[]): ShiftSuggestion[] {
   const suggestions: ShiftSuggestion[] = []
 
-  const noonSlots = hourlyDetail.filter((s) => s.time >= '11:00' && s.time <= '13:00')
+  const getStartHour = (timeStr: string) => parseInt(timeStr.split('-')[0].split(':')[0], 10)
+
+  const noonSlots = hourlyDetail.filter((s) => {
+    const hour = getStartHour(s.time)
+    return hour >= 11 && hour <= 13
+  })
   const noonShortages = noonSlots.reduce((sum, s) => sum + s.shortages, 0)
   const noonUrgent = noonSlots.reduce((sum, s) => sum + s.urgent, 0)
 
@@ -640,7 +645,7 @@ export function generateShiftSuggestions(hourlyDetail: HourlySlot[]): ShiftSugge
     suggestions.push({
       time: '10:30 - 11:00',
       type: '备包人员',
-      action: '增加1名备包护士，提前30分钟完成午高峰包型准备',
+      action: '增加1名备包护士，提前30分钟完成午高峰包型准备，覆盖11:00-14:00全时段',
       priority: 'high',
       expectedImprovement: '预计可减少60%午高峰缺包',
     })
@@ -650,7 +655,7 @@ export function generateShiftSuggestions(hourlyDetail: HourlySlot[]): ShiftSugge
     suggestions.push({
       time: '07:30 - 09:00',
       type: '消毒锅排程',
-      action: '将消毒锅第一锅开炉时间从9:00提前至7:30，优先消毒外科包、修复包',
+      action: '将消毒锅第一锅开炉时间从9:00提前至7:30，优先消毒外科包、修复包、种植包，确保午高峰前完成',
       priority: 'high',
       expectedImprovement: '午高峰前所有包型完成消毒',
     })
@@ -658,15 +663,28 @@ export function generateShiftSuggestions(hourlyDetail: HourlySlot[]): ShiftSugge
 
   if (noonShortages >= 2) {
     suggestions.push({
-      time: '11:00 - 13:00',
+      time: '11:00 - 14:00',
       type: '备包量',
-      action: '午高峰时段外科包、种植包备包量提升25%',
+      action: '午高峰时段（11:00-14:00）外科包、种植包、修复包备包量提升25%',
       priority: 'high',
       expectedImprovement: '预计可减少40%午高峰缺包',
     })
   }
 
-  const afternoonSlots = hourlyDetail.filter((s) => s.time >= '14:00' && s.time <= '16:00')
+  if (noonShortages >= 1 && noonUrgent >= 1) {
+    suggestions.push({
+      time: '12:30 - 13:00',
+      type: '备包人员',
+      action: '午高峰中间时段（12:30）安排1名护士补位，补充13:00-14:00时段所需包型',
+      priority: 'medium',
+      expectedImprovement: '覆盖午高峰后半段13:00-14:00的备包需求',
+    })
+  }
+
+  const afternoonSlots = hourlyDetail.filter((s) => {
+    const hour = getStartHour(s.time)
+    return hour >= 14 && hour <= 15
+  })
   const afternoonShortages = afternoonSlots.reduce((sum, s) => sum + s.shortages, 0)
 
   if (afternoonShortages >= 2) {
@@ -679,7 +697,10 @@ export function generateShiftSuggestions(hourlyDetail: HourlySlot[]): ShiftSugge
     })
   }
 
-  const morningSlots = hourlyDetail.filter((s) => s.time >= '09:00' && s.time <= '11:00')
+  const morningSlots = hourlyDetail.filter((s) => {
+    const hour = getStartHour(s.time)
+    return hour >= 9 && hour <= 10
+  })
   const morningShortages = morningSlots.reduce((sum, s) => sum + s.shortages, 0)
 
   if (morningShortages >= 2) {
@@ -692,7 +713,10 @@ export function generateShiftSuggestions(hourlyDetail: HourlySlot[]): ShiftSugge
     })
   }
 
-  if (hourlyDetail.every((s) => s.shortages === 0 && s.urgent === 0)) {
+  const totalShortages = hourlyDetail.reduce((sum, s) => sum + s.shortages, 0)
+  const totalUrgent = hourlyDetail.reduce((sum, s) => sum + s.urgent, 0)
+
+  if (totalShortages === 0 && totalUrgent === 0) {
     suggestions.push({
       time: '全天',
       type: '备包人员',

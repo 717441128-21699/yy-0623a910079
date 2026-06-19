@@ -379,22 +379,23 @@ interface DrawerPanelProps {
 }
 
 function DrawerPanel({ store, isOpen, onClose }: DrawerPanelProps) {
-  if (!store) return null
-
-  const totalAppointments = store.hourlyDetail.reduce((sum, d) => sum + d.appointments, 0)
-  const totalPacks = store.hourlyDetail.reduce((sum, d) => sum + d.packs, 0)
-  const totalShortages = store.hourlyDetail.reduce((sum, d) => sum + d.shortages, 0)
-  const totalUrgent = store.hourlyDetail.reduce((sum, d) => sum + d.urgent, 0)
+  const totalAppointments = store?.hourlyDetail.reduce((sum, d) => sum + d.appointments, 0) ?? 0
+  const totalPacks = store?.hourlyDetail.reduce((sum, d) => sum + d.packs, 0) ?? 0
+  const totalShortages = store?.hourlyDetail.reduce((sum, d) => sum + d.shortages, 0) ?? 0
+  const totalUrgent = store?.hourlyDetail.reduce((sum, d) => sum + d.urgent, 0) ?? 0
   const totalGap = totalPacks - totalAppointments
 
   const shiftSuggestions = useMemo(() => {
+    if (!store?.hourlyDetail) return []
     return generateShiftSuggestions(store.hourlyDetail)
-  }, [store.hourlyDetail])
+  }, [store?.hourlyDetail])
 
   const sortedSuggestions = useMemo(() => {
     const priorityOrder = { high: 0, medium: 1, low: 2 }
     return [...shiftSuggestions].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
   }, [shiftSuggestions])
+
+  if (!store || !isOpen) return null
 
   return (
     <>
@@ -562,9 +563,6 @@ export default function Overview() {
 
   const handleCloseDrawer = () => {
     setIsDrawerOpen(false)
-    setTimeout(() => {
-      setSelectedStore(null)
-    }, 300)
   }
 
   return (
