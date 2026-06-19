@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { AlertTriangle, Package, Clock, AlertCircle, Zap, X } from 'lucide-react'
 import {
   LineChart,
@@ -15,11 +15,24 @@ import {
   Cell,
 } from 'recharts'
 import { storeMetricsData } from '@/data/mockData'
-import type { StoreMetrics, HourlySlot } from '@/types'
+import type { StoreMetrics, HourlySlot, ShiftSuggestion } from '@/types'
+import { generateShiftSuggestions } from '@/utils/reportGenerator'
 
 const STORE_COLORS = ['#00D4AA', '#3B82F6', '#FFA502', '#A78BFA', '#FF4757']
 
 const NOON_PEAK_SLOTS = ['11:00-12:00', '12:00-13:00', '13:00-14:00']
+
+const PRIORITY_CONFIG = {
+  high: { label: '高', color: '#FF4757', bgColor: 'bg-red-500/20', textColor: 'text-red-400', borderColor: 'border-red-500/50' },
+  medium: { label: '中', color: '#FFA502', bgColor: 'bg-amber-500/20', textColor: 'text-amber-400', borderColor: 'border-amber-500/50' },
+  low: { label: '低', color: '#00D4AA', bgColor: 'bg-teal-500/20', textColor: 'text-teal-400', borderColor: 'border-teal-500/50' },
+}
+
+const TYPE_CONFIG = {
+  '备包人员': { bgColor: 'bg-blue-500/20', textColor: 'text-blue-400' },
+  '消毒锅排程': { bgColor: 'bg-amber-500/20', textColor: 'text-amber-400' },
+  '备包量': { bgColor: 'bg-teal-500/20', textColor: 'text-teal-400' },
+}
 
 const noonPeakStores = storeMetricsData.filter((s) => s.isNoonPeakShortage)
 
@@ -320,6 +333,45 @@ function HourlyChart({ data }: HourlyChartProps) {
   )
 }
 
+interface SuggestionCardProps {
+  suggestion: ShiftSuggestion
+}
+
+function SuggestionCard({ suggestion }: SuggestionCardProps) {
+  const priorityConfig = PRIORITY_CONFIG[suggestion.priority]
+  const typeConfig = TYPE_CONFIG[suggestion.type]
+
+  return (
+    <div
+      className={`relative rounded-lg border bg-navy-900/50 p-4 pl-5 ${priorityConfig.borderColor}`}
+    >
+      <div
+        className="absolute left-0 top-0 h-full w-1 rounded-l-lg"
+        style={{ backgroundColor: priorityConfig.color }}
+      />
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${priorityConfig.bgColor} ${priorityConfig.textColor}`}>
+            {priorityConfig.label}优先级
+          </span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${typeConfig.bgColor} ${typeConfig.textColor}`}>
+            {suggestion.type}
+          </span>
+        </div>
+        <span className="font-mono text-xs text-slate-400">
+          {suggestion.time}
+        </span>
+      </div>
+      <p className="font-sans text-sm text-slate-200 mb-1">
+        {suggestion.action}
+      </p>
+      <p className="font-sans text-xs text-slate-500">
+        预期效果：{suggestion.expectedImprovement}
+      </p>
+    </div>
+  )
+}
+
 interface DrawerPanelProps {
   store: StoreMetrics | null
   isOpen: boolean
@@ -335,6 +387,15 @@ function DrawerPanel({ store, isOpen, onClose }: DrawerPanelProps) {
   const totalUrgent = store.hourlyDetail.reduce((sum, d) => sum + d.urgent, 0)
   const totalGap = totalPacks - totalAppointments
 
+  const shiftSuggestions = useMemo(() => {
+    return generateShiftSuggestions(store.hourlyDetail)
+  }, [store.hourlyDetail])
+
+  const sortedSuggestions = useMemo(() => {
+    const priorityOrder = { high: 0, medium: 1, low: 2 }
+    return [...shiftSuggestions].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+  }, [shiftSuggestions])
+
   return (
     <>
       <div
@@ -345,7 +406,7 @@ function DrawerPanel({ store, isOpen, onClose }: DrawerPanelProps) {
       />
 
       <div
-        className={`fixed top-0 right-0 h-full w-[700px] bg-navy-950 border-l border-navy-700/50 z-50 transform transition-transform duration-300 ease-out ${
+        className={`fixed top-0 right-0 max-h-[90vh] mt-[5vh] w-[700px] bg-navy-950 border-l border-t border-b border-navy-700/50 z-50 transform transition-transform duration-300 ease-out rounded-l-lg ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -416,6 +477,18 @@ function DrawerPanel({ store, isOpen, onClose }: DrawerPanelProps) {
                 </div>
               </div>
               <HourlyChart data={store.hourlyDetail} />
+            </div>
+
+            <div className="mb-4">
+              <h3 className="flex items-center gap-2 font-sans text-base font-medium text-slate-200 mb-4">
+                <Clock size={18} className="text-mint-500" />
+                班次建议
+              </h3>
+              <div className="space-y-3">
+                {sortedSuggestions.map((suggestion, index) => (
+                  <SuggestionCard key={index} suggestion={suggestion} />
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">

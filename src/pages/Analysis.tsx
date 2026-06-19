@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts'
-import { Package, AlertTriangle, Clock, Wrench, Calculator, Minus, Plus, RotateCcw } from 'lucide-react'
+import { Package, AlertTriangle, Clock, Wrench, Calculator, Minus, Plus, RotateCcw, Check, Wallet, Sparkles } from 'lucide-react'
 import {
   packTypeUtilizationData,
   anomalyStoreData,
@@ -20,8 +20,10 @@ import {
   runPackSimulation,
   getRecommendation,
   estimateCost,
+  generateBudgetRecommendation,
   type SimulationResult,
 } from '@/utils/packSimulator'
+import type { BudgetRecommendation } from '@/types'
 
 const statusConfig: Record<string, { color: string; label: string; bg: string }> = {
   surplus: { color: '#00D4AA', label: '闲置', bg: 'rgba(0,212,170,0.15)' },
@@ -108,7 +110,11 @@ function UtilizationOverview() {
 }
 
 function PackSimulation() {
+  const [simulationTab, setSimulationTab] = useState<'manual' | 'budget'>('manual')
   const [packAdjustments, setPackAdjustments] = useState<Record<string, number>>({})
+  const [budget, setBudget] = useState<number>(3000)
+  const [budgetRecommendation, setBudgetRecommendation] = useState<BudgetRecommendation | null>(null)
+  const [showApplySuccess, setShowApplySuccess] = useState(false)
 
   const simulationResult: SimulationResult | null = useMemo(() => {
     const hasAdjustments = Object.values(packAdjustments).some((v) => v > 0)
@@ -132,9 +138,33 @@ function PackSimulation() {
 
   const handleReset = () => {
     setPackAdjustments({})
+    setBudgetRecommendation(null)
+    setShowApplySuccess(false)
+  }
+
+  const handleGenerateRecommendation = () => {
+    if (budget > 0) {
+      const recommendation = generateBudgetRecommendation(budget)
+      setBudgetRecommendation(recommendation)
+    }
+  }
+
+  const handleApplyRecommendation = () => {
+    if (!budgetRecommendation) return
+
+    const newAdjustments: Record<string, number> = {}
+    budgetRecommendation.allocations.forEach((alloc) => {
+      newAdjustments[alloc.packType] = alloc.addCount
+    })
+    setPackAdjustments(newAdjustments)
+    setShowApplySuccess(true)
+    setSimulationTab('manual')
+
+    setTimeout(() => setShowApplySuccess(false), 3000)
   }
 
   const hasChanges = simulationResult && Object.values(packAdjustments).some((v) => v > 0)
+  const quickAmounts = [1000, 2000, 3000, 5000]
 
   return (
     <div className="bg-navy-900 border border-navy-700/50 rounded-lg p-5 flex flex-col">
@@ -152,181 +182,351 @@ function PackSimulation() {
         </button>
       </div>
 
-      <div className="space-y-2.5 mb-4">
-        {packTypeOptions.map((packType) => {
-          const count = packAdjustments[packType] || 0
-          const item = packTypeUtilizationData.find((d) => d.packType === packType)
-          const cfg = item ? statusConfig[item.status] : null
-
-          return (
-            <div
-              key={packType}
-              className="flex items-center justify-between bg-navy-800/60 rounded-lg px-3 py-2"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-slate-300 text-xs w-14">{packType}</span>
-                {cfg && (
-                  <span
-                    className="font-mono px-1.5 py-0.5 rounded text-[10px]"
-                    style={{ color: cfg.color, backgroundColor: cfg.bg }}
-                  >
-                    {cfg.label}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleAdjust(packType, -1)}
-                  disabled={count === 0}
-                  className="w-6 h-6 rounded bg-navy-700 hover:bg-navy-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-                >
-                  <Minus size={12} className="text-slate-300" />
-                </button>
-                <span className="font-mono text-white text-sm w-6 text-center">{count}</span>
-                <button
-                  onClick={() => handleAdjust(packType, 1)}
-                  disabled={count === 5}
-                  className="w-6 h-6 rounded bg-navy-700 hover:bg-navy-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-                >
-                  <Plus size={12} className="text-slate-300" />
-                </button>
-              </div>
-            </div>
-          )
-        })}
+      <div className="flex bg-navy-800/60 rounded-lg p-1 mb-4">
+        <button
+          onClick={() => setSimulationTab('manual')}
+          className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all duration-200 font-sans ${
+            simulationTab === 'manual'
+              ? 'bg-mint-500 text-navy-950'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          手动调整
+        </button>
+        <button
+          onClick={() => setSimulationTab('budget')}
+          className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all duration-200 font-sans ${
+            simulationTab === 'budget'
+              ? 'bg-mint-500 text-navy-950'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          预算推荐
+        </button>
       </div>
 
-      {hasChanges && simulationResult && (
-        <div className="flex-1 space-y-3 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-navy-800/60 rounded-lg p-3 text-center">
-              <p className="text-[10px] text-slate-500 mb-1 font-sans">风险降低</p>
-              <p className="text-2xl font-bold text-mint-500 font-mono">
-                {simulationResult.riskReduction}%
-              </p>
-            </div>
-            <div className="bg-navy-800/60 rounded-lg p-3 text-center">
-              <p className="text-[10px] text-slate-500 mb-1 font-sans">紧张包型</p>
-              <p className="text-sm font-mono text-white">
-                <span className="text-warn-red">{simulationResult.originalTightCount}</span>
-                <span className="text-slate-500 mx-1">→</span>
-                <span className="text-mint-500">{simulationResult.adjustedTightCount}</span>
-              </p>
-              <p className="text-[10px] text-mint-500/70 font-mono">
-                减少 {simulationResult.originalTightCount - simulationResult.adjustedTightCount}
-              </p>
-            </div>
+      {showApplySuccess && (
+        <div className="mb-3 flex items-center gap-2 bg-mint-500/20 border border-mint-500/50 rounded-lg px-3 py-2 animate-pulse">
+          <Check size={14} className="text-mint-500" />
+          <span className="text-xs text-mint-400 font-sans">推荐方案已应用到手动调整器</span>
+        </div>
+      )}
+
+      {simulationTab === 'manual' ? (
+        <>
+          <div className="space-y-2.5 mb-4">
+            {packTypeOptions.map((packType) => {
+              const count = packAdjustments[packType] || 0
+              const item = packTypeUtilizationData.find((d) => d.packType === packType)
+              const cfg = item ? statusConfig[item.status] : null
+
+              return (
+                <div
+                  key={packType}
+                  className="flex items-center justify-between bg-navy-800/60 rounded-lg px-3 py-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-300 text-xs w-14">{packType}</span>
+                    {cfg && (
+                      <span
+                        className="font-mono px-1.5 py-0.5 rounded text-[10px]"
+                        style={{ color: cfg.color, backgroundColor: cfg.bg }}
+                      >
+                        {cfg.label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleAdjust(packType, -1)}
+                      disabled={count === 0}
+                      className="w-6 h-6 rounded bg-navy-700 hover:bg-navy-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                    >
+                      <Minus size={12} className="text-slate-300" />
+                    </button>
+                    <span className="font-mono text-white text-sm w-6 text-center">{count}</span>
+                    <button
+                      onClick={() => handleAdjust(packType, 1)}
+                      disabled={count === 5}
+                      className="w-6 h-6 rounded bg-navy-700 hover:bg-navy-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                    >
+                      <Plus size={12} className="text-slate-300" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
-          {simulationResult.affectedStores.length > 0 && (
-            <div className="bg-navy-800/60 rounded-lg p-3">
-              <p className="text-xs text-slate-400 mb-2 font-sans">受影响门店预估</p>
-              <div className="space-y-1.5">
-                {simulationResult.affectedStores.map((store) => (
-                  <div key={store.storeName} className="flex items-center justify-between text-xs">
-                    <span className="text-slate-300 truncate">{store.storeName}</span>
-                    <div className="flex items-center gap-1.5 font-mono">
-                      <span className="text-warn-red">{store.originalShortages}</span>
-                      <span className="text-slate-500">→</span>
-                      <span className="text-mint-500">{store.estimatedShortages}</span>
-                      <span className="text-mint-500/70 text-[10px]">(-{store.reduction})</span>
-                    </div>
+          {hasChanges && simulationResult && (
+            <div className="flex-1 space-y-3 overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-navy-800/60 rounded-lg p-3 text-center">
+                  <p className="text-[10px] text-slate-500 mb-1 font-sans">风险降低</p>
+                  <p className="text-2xl font-bold text-mint-500 font-mono">
+                    {simulationResult.riskReduction}%
+                  </p>
+                </div>
+                <div className="bg-navy-800/60 rounded-lg p-3 text-center">
+                  <p className="text-[10px] text-slate-500 mb-1 font-sans">紧张包型</p>
+                  <p className="text-sm font-mono text-white">
+                    <span className="text-warn-red">{simulationResult.originalTightCount}</span>
+                    <span className="text-slate-500 mx-1">→</span>
+                    <span className="text-mint-500">{simulationResult.adjustedTightCount}</span>
+                  </p>
+                  <p className="text-[10px] text-mint-500/70 font-mono">
+                    减少 {simulationResult.originalTightCount - simulationResult.adjustedTightCount}
+                  </p>
+                </div>
+              </div>
+
+              {simulationResult.affectedStores.length > 0 && (
+                <div className="bg-navy-800/60 rounded-lg p-3">
+                  <p className="text-xs text-slate-400 mb-2 font-sans">受影响门店预估</p>
+                  <div className="space-y-1.5">
+                    {simulationResult.affectedStores.map((store) => (
+                      <div key={store.storeName} className="flex items-center justify-between text-xs">
+                        <span className="text-slate-300 truncate">{store.storeName}</span>
+                        <div className="flex items-center gap-1.5 font-mono">
+                          <span className="text-warn-red">{store.originalShortages}</span>
+                          <span className="text-slate-500">→</span>
+                          <span className="text-mint-500">{store.estimatedShortages}</span>
+                          <span className="text-mint-500/70 text-[10px]">(-{store.reduction})</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              )}
+
+              <div className="bg-navy-800/60 rounded-lg p-3">
+                <p className="text-xs text-slate-400 mb-2 font-sans">利用率变化</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[10px]">
+                    <thead>
+                      <tr className="text-slate-500">
+                        <th className="text-left pb-1.5 font-normal">包型</th>
+                        <th className="text-right pb-1.5 font-normal">原利用率</th>
+                        <th className="text-right pb-1.5 font-normal">新利用率</th>
+                        <th className="text-right pb-1.5 font-normal">原状态</th>
+                        <th className="text-right pb-1.5 font-normal pl-1">新状态</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {simulationResult.utilizationChanges.map((change) => {
+                        const isChanged = change.originalRate !== change.adjustedRate
+                        const originalCfg = statusConfig[change.originalStatus]
+                        const adjustedCfg = statusConfig[change.adjustedStatus]
+
+                        return (
+                          <tr
+                            key={change.packType}
+                            className={isChanged ? 'bg-mint-500/10' : ''}
+                          >
+                            <td className="py-1 text-slate-300">{change.packType}</td>
+                            <td className="py-1 text-right font-mono text-slate-400">
+                              {change.originalRate}%
+                            </td>
+                            <td className="py-1 text-right font-mono text-mint-500">
+                              {change.adjustedRate}%
+                            </td>
+                            <td className="py-1 text-right">
+                              <span
+                                className="px-1 py-0.5 rounded"
+                                style={{
+                                  color: originalCfg?.color,
+                                  backgroundColor: originalCfg?.bg,
+                                }}
+                              >
+                                {originalCfg?.label}
+                              </span>
+                            </td>
+                            <td className="py-1 text-right pl-1">
+                              <span
+                                className="px-1 py-0.5 rounded"
+                                style={{
+                                  color: adjustedCfg?.color,
+                                  backgroundColor: adjustedCfg?.bg,
+                                }}
+                              >
+                                {adjustedCfg?.label}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {Object.entries(packAdjustments)
+                  .filter(([_, count]) => count > 0)
+                  .map(([packType, count]) => {
+                    const item = packTypeUtilizationData.find((d) => d.packType === packType)
+                    if (!item) return null
+                    return (
+                      <div key={packType} className="bg-navy-800/60 rounded-lg p-3">
+                        <p className="text-xs text-mint-500/80 font-sans">
+                          {getRecommendation(packType, item.utilizationRate)}
+                        </p>
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           )}
 
-          <div className="bg-navy-800/60 rounded-lg p-3">
-            <p className="text-xs text-slate-400 mb-2 font-sans">利用率变化</p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-[10px]">
-                <thead>
-                  <tr className="text-slate-500">
-                    <th className="text-left pb-1.5 font-normal">包型</th>
-                    <th className="text-right pb-1.5 font-normal">原利用率</th>
-                    <th className="text-right pb-1.5 font-normal">新利用率</th>
-                    <th className="text-right pb-1.5 font-normal">原状态</th>
-                    <th className="text-right pb-1.5 font-normal pl-1">新状态</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {simulationResult.utilizationChanges.map((change) => {
-                    const isChanged = change.originalRate !== change.adjustedRate
-                    const originalCfg = statusConfig[change.originalStatus]
-                    const adjustedCfg = statusConfig[change.adjustedStatus]
+          {totalCost > 0 && (
+            <div className="mt-3 pt-3 border-t border-navy-700/30 flex items-center justify-between">
+              <span className="text-xs text-slate-500 font-sans">预估成本</span>
+              <span className="font-mono text-mint-500 font-semibold">¥{totalCost}</span>
+            </div>
+          )}
 
-                    return (
-                      <tr
-                        key={change.packType}
-                        className={isChanged ? 'bg-mint-500/10' : ''}
-                      >
-                        <td className="py-1 text-slate-300">{change.packType}</td>
-                        <td className="py-1 text-right font-mono text-slate-400">
-                          {change.originalRate}%
-                        </td>
-                        <td className="py-1 text-right font-mono text-mint-500">
-                          {change.adjustedRate}%
-                        </td>
-                        <td className="py-1 text-right">
-                          <span
-                            className="px-1 py-0.5 rounded"
-                            style={{
-                              color: originalCfg?.color,
-                              backgroundColor: originalCfg?.bg,
-                            }}
-                          >
-                            {originalCfg?.label}
-                          </span>
-                        </td>
-                        <td className="py-1 text-right pl-1">
-                          <span
-                            className="px-1 py-0.5 rounded"
-                            style={{
-                              color: adjustedCfg?.color,
-                              backgroundColor: adjustedCfg?.bg,
-                            }}
-                          >
-                            {adjustedCfg?.label}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+          {!simulationResult && (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-xs text-slate-500 font-sans">调整包型增配数量，查看模拟效果</p>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Wallet size={14} className="text-mint-500" />
+              <span className="text-xs text-slate-300 font-sans">设置预算上限</span>
+            </div>
+
+            <div className="flex items-center gap-2 mb-3">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-sm">
+                  ¥
+                </span>
+                <input
+                  type="number"
+                  value={budget}
+                  onChange={(e) => setBudget(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full bg-navy-800/60 border border-navy-700/50 rounded-lg pl-8 pr-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-mint-500/50 transition-colors"
+                  min={0}
+                  step={100}
+                />
+              </div>
+              <button
+                onClick={handleGenerateRecommendation}
+                className="flex items-center gap-1.5 bg-mint-500 hover:bg-mint-400 text-navy-950 px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-200 hover:scale-105 active:scale-95 font-sans"
+              >
+                <Sparkles size={14} />
+                生成推荐方案
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              {quickAmounts.map((amount) => (
+                <button
+                  key={amount}
+                  onClick={() => setBudget(amount)}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-full transition-all duration-200 font-mono ${
+                    budget === amount
+                      ? 'bg-mint-500 text-navy-950'
+                      : 'bg-navy-800/60 text-slate-400 hover:text-white hover:bg-navy-700/60'
+                  }`}
+                >
+                  ¥{amount}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="space-y-2">
-            {Object.entries(packAdjustments)
-              .filter(([_, count]) => count > 0)
-              .map(([packType, count]) => {
-                const item = packTypeUtilizationData.find((d) => d.packType === packType)
-                if (!item) return null
-                return (
-                  <div key={packType} className="bg-navy-800/60 rounded-lg p-3">
-                    <p className="text-xs text-mint-500/80 font-sans">
-                      {getRecommendation(packType, item.utilizationRate)}
-                    </p>
-                  </div>
-                )
-              })}
-          </div>
-        </div>
-      )}
+          {budgetRecommendation ? (
+            <div className="flex-1 space-y-3 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-navy-800/60 rounded-lg p-2.5 text-center">
+                  <p className="text-[10px] text-slate-500 mb-0.5 font-sans">总预算</p>
+                  <p className="text-sm font-bold text-white font-mono">
+                    ¥{budgetRecommendation.budget}
+                  </p>
+                </div>
+                <div className="bg-navy-800/60 rounded-lg p-2.5 text-center">
+                  <p className="text-[10px] text-slate-500 mb-0.5 font-sans">已使用</p>
+                  <p className="text-sm font-bold text-mint-500 font-mono">
+                    ¥{budgetRecommendation.totalCost}
+                  </p>
+                </div>
+                <div className="bg-navy-800/60 rounded-lg p-2.5 text-center">
+                  <p className="text-[10px] text-slate-500 mb-0.5 font-sans">剩余</p>
+                  <p className="text-sm font-bold text-slate-400 font-mono">
+                    ¥{budgetRecommendation.remainingBudget}
+                  </p>
+                </div>
+              </div>
 
-      {totalCost > 0 && (
-        <div className="mt-3 pt-3 border-t border-navy-700/30 flex items-center justify-between">
-          <span className="text-xs text-slate-500 font-sans">预估成本</span>
-          <span className="font-mono text-mint-500 font-semibold">¥{totalCost}</span>
-        </div>
-      )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-navy-800/60 rounded-lg p-3 text-center">
+                  <p className="text-[10px] text-slate-500 mb-1 font-sans">预估风险降低</p>
+                  <p className="text-2xl font-bold text-mint-500 font-mono">
+                    {budgetRecommendation.estimatedRiskReduction}%
+                  </p>
+                </div>
+                <div className="bg-navy-800/60 rounded-lg p-3 text-center">
+                  <p className="text-[10px] text-slate-500 mb-1 font-sans">紧张包型</p>
+                  <p className="text-sm font-mono text-white">
+                    <span className="text-warn-red">{budgetRecommendation.originalTightCount}</span>
+                    <span className="text-slate-500 mx-1">→</span>
+                    <span className="text-mint-500">{budgetRecommendation.estimatedTightCount}</span>
+                  </p>
+                  <p className="text-[10px] text-mint-500/70 font-mono">
+                    减少 {budgetRecommendation.originalTightCount - budgetRecommendation.estimatedTightCount}
+                  </p>
+                </div>
+              </div>
 
-      {!simulationResult && (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-xs text-slate-500 font-sans">调整包型增配数量，查看模拟效果</p>
-        </div>
+              <div className="bg-navy-800/60 rounded-lg p-3">
+                <p className="text-xs text-slate-400 mb-2 font-sans">资源分配方案</p>
+                <div className="space-y-1">
+                  {budgetRecommendation.allocations.map((alloc, index) => (
+                    <div
+                      key={alloc.packType}
+                      className={`flex items-center justify-between py-2 ${
+                        index < budgetRecommendation.allocations.length - 1
+                          ? 'border-b border-navy-700/30'
+                          : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-300 text-xs w-14">{alloc.packType}</span>
+                        <span className="font-mono text-mint-500 text-xs">
+                          ×{alloc.addCount}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs font-mono">
+                        <span className="text-slate-500">¥{alloc.unitCost}/套</span>
+                        <span className="text-white">¥{alloc.totalCost}</span>
+                        <span className="text-mint-500/80">-{alloc.estimatedRiskReduction}%风险</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={handleApplyRecommendation}
+                className="w-full flex items-center justify-center gap-2 bg-mint-500 hover:bg-mint-400 text-navy-950 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] font-sans group"
+              >
+                <Check size={16} className="transition-transform group-hover:rotate-12" />
+                应用推荐方案
+              </button>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <Sparkles size={32} className="text-slate-600 mx-auto mb-2" />
+                <p className="text-xs text-slate-500 font-sans">设置预算后点击生成推荐方案</p>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

@@ -1,4 +1,4 @@
-import type { PackTypeUtilization, AnomalyStore } from '@/types'
+import type { PackTypeUtilization, AnomalyStore, BudgetRecommendation } from '@/types'
 import { packTypeUtilizationData, anomalyStoreData } from '@/data/mockData'
 
 export interface SimulationResult {
@@ -114,3 +114,98 @@ export function estimateCost(packType: string, count: number): number {
   }
   return (costMap[packType] || 300) * count
 }
+
+export function generateBudgetRecommendation(budget: number): BudgetRecommendation {
+  const costMap: Record<string, number> = {
+    洁牙包: 120,
+    根管包: 280,
+    外科包: 450,
+    正畸包: 380,
+    修复包: 320,
+    种植包: 680,
+  }
+
+  const riskReductionPerPack: Record<string, number> = {
+    洁牙包: 5,
+    根管包: 10,
+    外科包: 25,
+    正畸包: 8,
+    修复包: 15,
+    种植包: 20,
+  }
+
+  const tightPackTypes = packTypeUtilizationData.filter((p) => p.status === 'tight')
+  const normalPackTypes = packTypeUtilizationData.filter((p) => p.status === 'normal' && p.utilizationRate >= 70)
+
+  const candidates = [...tightPackTypes, ...normalPackTypes]
+    .map((p) => ({
+      packType: p.packType,
+      utilizationRate: p.utilizationRate,
+      cost: costMap[p.packType] || 300,
+      riskReduction: riskReductionPerPack[p.packType] || 10,
+      costEfficiency: (riskReductionPerPack[p.packType] || 10) / (costMap[p.packType] || 300),
+    }))
+    .sort((a, b) => b.costEfficiency - a.costEfficiency)
+
+  const allocations: BudgetRecommendation['allocations'] = []
+  let remainingBudget = budget
+  let totalCost = 0
+  let totalRiskReduction = 0
+
+  for (const candidate of candidates) {
+    if (remainingBudget < candidate.cost) continue
+
+    const maxPacks = Math.min(3, Math.floor(remainingBudget / candidate.cost))
+    if (maxPacks <= 0) continue
+
+    let addCount = 0
+    for (let i = 1; i <= maxPacks; i++) {
+      const simulatedUtilization = Math.round(
+        (packTypeUtilizationData.find((p) => p.packType === candidate.packType)!.usedPacks /
+          (packTypeUtilizationData.find((p) => p.packType === candidate.packType)!.totalPacks + i)) *
+          100
+      )
+      if (simulatedUtilization >= 60) {
+        addCount = i
+      } else {
+        break
+      }
+    }
+
+    if (addCount > 0) {
+      const packCost = candidate.cost * addCount
+      const packRiskReduction = candidate.riskReduction * addCount
+
+      if (remainingBudget >= packCost) {
+        allocations.push({
+          packType: candidate.packType,
+          addCount,
+          unitCost: candidate.cost,
+          totalCost: packCost,
+          estimatedRiskReduction: packRiskReduction,
+        })
+        totalCost += packCost
+        remainingBudget -= packCost
+        totalRiskReduction += packRiskReduction
+      }
+    }
+  }
+
+  const originalTightCount = packTypeUtilizationData.filter((p) => p.status === 'tight').length
+  const adjustedAdjustments: Record<string, number> = {}
+  allocations.forEach((a) => {
+    adjustedAdjustments[a.packType] = a.addCount
+  })
+  const simResult = runPackSimulation(adjustedAdjustments)
+
+  return {
+    budget,
+    totalCost,
+    remainingBudget,
+    allocations,
+    estimatedRiskReduction: Math.min(totalRiskReduction, 100),
+    originalTightCount,
+    estimatedTightCount: simResult.adjustedTightCount,
+  }
+}
+

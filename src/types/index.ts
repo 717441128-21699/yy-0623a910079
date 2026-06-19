@@ -75,10 +75,70 @@ export interface WeeklyReport {
   suggestions: Suggestion[]
 }
 
-export type DateRangePreset = 'all' | 'thisWeek' | 'lastWeek' | 'custom'
+export type DateRangePreset = 'all' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'custom'
 
 export interface DateRange {
   preset: DateRangePreset
   start: string
   end: string
+}
+
+export interface MonthlyTrendItem {
+  week: string
+  count: number
+}
+
+export interface MonthlyReasonCompare {
+  reason: ReviewReason
+  lastMonthCount: number
+  currentMonthCount: number
+  change: number
+  changePercentage: number
+}
+
+export interface MonthlyStoreCompare {
+  storeId: string
+  storeName: string
+  lastMonthCount: number
+  currentMonthCount: number
+  change: number
+  changePercentage: number
+}
+
+export interface MonthlyReport {
+  monthRange: string
+  totalShortages: number
+  lastMonthTotal: number
+  monthlyChange: number
+  monthlyChangePercentage: number
+  trend: MonthlyTrendItem[]
+  reasonCompare: MonthlyReasonCompare[]
+  storeCompare: MonthlyStoreCompare[]
+  topStores: AnomalyStore[]
+  topTimeSlots: AnomalyTimeSlot[]
+  suggestions: Suggestion[]
+}
+
+export interface BudgetRecommendation {
+  budget: number
+  totalCost: number
+  remainingBudget: number
+  allocations: {
+    packType: string
+    addCount: number
+    unitCost: number
+    totalCost: number
+    estimatedRiskReduction: number
+  }[]
+  estimatedRiskReduction: number
+  originalTightCount: number
+  estimatedTightCount: number
+}
+
+export interface ShiftSuggestion {
+  time: string
+  type: '备包人员' | '消毒锅排程' | '备包量'
+  action: string
+  priority: 'high' | 'medium' | 'low'
+  expectedImprovement: string
 }
