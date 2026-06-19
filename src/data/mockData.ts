@@ -6,7 +6,25 @@ import type {
   FrequentInstrument,
   ReviewRecord,
   WeeklyReport,
+  HourlySlot,
 } from '@/types'
+
+const generateHourlyDetail = (storeId: string): HourlySlot[] => {
+  const isTroubleStore = ['S001', 'S003', 'S005'].includes(storeId)
+  const baseShortage = isTroubleStore ? [0, 1, 0, 2, 3, 2, 1, 0] : [0, 0, 0, 0, 1, 0, 0, 0]
+  const baseUrgent = isTroubleStore ? [0, 1, 0, 1, 2, 1, 1, 0] : [0, 0, 0, 0, 0, 0, 0, 0]
+
+  return [
+    { time: '09:00-10:00', appointments: 5, packs: 5, shortages: baseShortage[0], urgent: baseUrgent[0] },
+    { time: '10:00-11:00', appointments: 8, packs: 7, shortages: baseShortage[1], urgent: baseUrgent[1] },
+    { time: '11:00-12:00', appointments: 10, packs: 8, shortages: baseShortage[2], urgent: baseUrgent[2] },
+    { time: '12:00-13:00', appointments: 6, packs: 4, shortages: baseShortage[3], urgent: baseUrgent[3] },
+    { time: '13:00-14:00', appointments: 7, packs: 5, shortages: baseShortage[4], urgent: baseUrgent[4] },
+    { time: '14:00-15:00', appointments: 6, packs: 5, shortages: baseShortage[5], urgent: baseUrgent[5] },
+    { time: '15:00-16:00', appointments: 5, packs: 5, shortages: baseShortage[6], urgent: baseUrgent[6] },
+    { time: '16:00-17:00', appointments: 5, packs: 5, shortages: baseShortage[7], urgent: baseUrgent[7] },
+  ]
+}
 
 export const storeMetricsData: StoreMetrics[] = [
   {
@@ -26,6 +44,7 @@ export const storeMetricsData: StoreMetrics[] = [
       { date: '06-19', shortageCount: 3 },
       { date: '06-20', shortageCount: 5 },
     ],
+    hourlyDetail: generateHourlyDetail('S001'),
   },
   {
     storeId: 'S002',
@@ -44,6 +63,7 @@ export const storeMetricsData: StoreMetrics[] = [
       { date: '06-19', shortageCount: 2 },
       { date: '06-20', shortageCount: 2 },
     ],
+    hourlyDetail: generateHourlyDetail('S002'),
   },
   {
     storeId: 'S003',
@@ -62,6 +82,7 @@ export const storeMetricsData: StoreMetrics[] = [
       { date: '06-19', shortageCount: 6 },
       { date: '06-20', shortageCount: 8 },
     ],
+    hourlyDetail: generateHourlyDetail('S003'),
   },
   {
     storeId: 'S004',
@@ -80,6 +101,7 @@ export const storeMetricsData: StoreMetrics[] = [
       { date: '06-19', shortageCount: 1 },
       { date: '06-20', shortageCount: 1 },
     ],
+    hourlyDetail: generateHourlyDetail('S004'),
   },
   {
     storeId: 'S005',
@@ -98,6 +120,7 @@ export const storeMetricsData: StoreMetrics[] = [
       { date: '06-19', shortageCount: 4 },
       { date: '06-20', shortageCount: 6 },
     ],
+    hourlyDetail: generateHourlyDetail('S005'),
   },
 ]
 
@@ -250,6 +273,12 @@ export const weeklyReportData: WeeklyReport = {
     { instrumentName: '外科拔牙钳', shortageCount: 14, relatedPackTypes: ['外科包'] },
     { instrumentName: '种植机头', shortageCount: 11, relatedPackTypes: ['种植包'] },
     { instrumentName: '修复取模托盘', shortageCount: 9, relatedPackTypes: ['修复包'] },
+  ],
+  reasonDistribution: [
+    { reason: '预约变更', count: 7, percentage: 31.8 },
+    { reason: '消毒锅排程', count: 6, percentage: 27.3 },
+    { reason: '器械损坏', count: 5, percentage: 22.7 },
+    { reason: '人员漏备', count: 4, percentage: 18.2 },
   ],
   suggestions: [
     { type: '增配包', target: '西城金融街店', description: '建议增配2套外科包和1套种植包，该门店本周缺包率持续最高，外科包和种植包长期紧张' },

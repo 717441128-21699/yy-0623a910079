@@ -7,6 +7,15 @@ export interface StoreMetrics {
   urgentCount: number
   isNoonPeakShortage: boolean
   trend7Days: { date: string; shortageCount: number }[]
+  hourlyDetail: HourlySlot[]
+}
+
+export interface HourlySlot {
+  time: string
+  appointments: number
+  packs: number
+  shortages: number
+  urgent: number
 }
 
 export interface PackTypeUtilization {
@@ -47,6 +56,7 @@ export interface ReviewRecord {
   note: string
   createdBy: string
   createdAt: string
+  instrument?: string
 }
 
 export interface Suggestion {
@@ -61,5 +71,14 @@ export interface WeeklyReport {
   topShortageStores: AnomalyStore[]
   topShortageTimeSlots: AnomalyTimeSlot[]
   topMissingInstruments: FrequentInstrument[]
+  reasonDistribution: { reason: ReviewReason; count: number; percentage: number }[]
   suggestions: Suggestion[]
+}
+
+export type DateRangePreset = 'all' | 'thisWeek' | 'lastWeek' | 'custom'
+
+export interface DateRange {
+  preset: DateRangePreset
+  start: string
+  end: string
 }
